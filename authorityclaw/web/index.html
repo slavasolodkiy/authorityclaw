@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northside Roasters payments agent</title>
+<style>
+  :root {
+    --paper: #EDF1EC;
+    --slip: #F8FAF6;
+    --ink: #1C2A33;
+    --muted: #5B6A64;
+    --rule: #C3CEC7;
+    --paid: #2F6B47;
+    --held: #9C6B12;
+    --refused: #A3262E;
+    --sans: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --figures: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--sans); }
+  button { font: inherit; }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  header { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; justify-content: space-between;
+           padding: 20px clamp(16px, 4vw, 40px) 16px; border-bottom: 1px solid var(--rule); }
+  header h1 { margin: 0; font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; }
+  header h1 span { font-weight: 400; color: var(--muted); }
+  .pulse { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.95rem; }
+  .pulse i { width: 10px; height: 10px; border-radius: 50%; background: var(--paid); flex: none; }
+  .pulse.stale i { background: var(--refused); }
+
+  main { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: clamp(20px, 3vw, 40px);
+         padding: 24px clamp(16px, 4vw, 40px) 48px; max-width: 1280px; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+
+  h2 { font-size: 1.05rem; margin: 0 0 4px; font-weight: 600; }
+  .lede { margin: 0 0 18px; color: var(--muted); font-size: 0.95rem; max-width: 60ch; }
+
+  /* authority ladder */
+  .ladder { list-style: none; margin: 0; padding: 0; }
+  .rung { position: relative; padding: 10px 0 12px 22px; border-left: 2px solid var(--ink); }
+  .rung:last-child { border-left-color: transparent; }
+  .rung::before { content: ""; position: absolute; left: -7px; top: 15px; width: 12px; height: 12px;
+                  border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
+  .rung.revoked { border-left-style: dashed; border-left-color: var(--refused); }
+  .rung.revoked::before { border-color: var(--refused); background: var(--refused); }
+  .rung.blocked { color: var(--muted); }
+  .rung strong { display: block; font-weight: 600; }
+  .rung .role { color: var(--muted); font-size: 0.9rem; }
+  .rung .limit { font-family: var(--figures); font-variant-numeric: lining-nums tabular-nums; font-size: 0.98rem; }
+  .rung .state { display: block; font-size: 0.85rem; color: var(--refused); }
+  .rung button { margin-top: 8px; }
+
+  .btn { border: 1.5px solid var(--ink); background: transparent; color: var(--ink); border-radius: 4px;
+         padding: 6px 12px; cursor: pointer; }
+  .btn:hover { background: var(--ink); color: var(--slip); }
+  .btn.warn { border-color: var(--refused); color: var(--refused); }
+  .btn.warn:hover { background: var(--refused); color: var(--slip); }
+  .btn.go { border-color: var(--paid); color: var(--paid); }
+  .btn.go:hover { background: var(--paid); color: var(--slip); }
+
+  .meter { margin-top: 26px; }
+  .meter .bar { height: 8px; background: var(--slip); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+  .meter .bar b { display: block; height: 100%; background: var(--ink); }
+  .meter p, .record { margin: 6px 0 0; font-size: 0.92rem; color: var(--muted); }
+  .figure { font-family: var(--figures); font-variant-numeric: lining-nums tabular-nums; color: var(--ink); }
+  .record { margin-top: 22px; }
+  .record.broken { color: var(--refused); }
+
+  /* remittance slips */
+  .slips { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .slip { position: relative; background: var(--slip); border: 1px solid var(--rule); border-top: 2px dashed var(--rule);
+          border-radius: 0 0 4px 4px; padding: 14px 150px 14px 18px; min-height: 112px; }
+  @media (max-width: 560px) { .slip { padding-right: 18px; padding-top: 70px; } }
+  .slip .who { font-weight: 600; }
+  .slip .ref { color: var(--muted); font-size: 0.9rem; margin-left: 6px; }
+  .slip .amount { font-family: var(--figures); font-variant-numeric: lining-nums tabular-nums;
+                  font-size: 1.9rem; line-height: 1.2; margin: 2px 0 6px; }
+  .slip ul { margin: 0; padding-left: 18px; font-size: 0.93rem; max-width: 70ch; }
+  .slip .foot { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+  .slip .note { margin: 8px 0 0; font-size: 0.93rem; max-width: 70ch; }
+  .slip .flag { display: inline-block; margin-top: 8px; font-size: 0.85rem; color: var(--refused);
+                border-left: 3px solid var(--refused); padding-left: 8px; }
+  .slip .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .slip.event { min-height: 0; padding: 10px 18px; border-top-style: solid; color: var(--muted); font-size: 0.93rem; }
+
+  .stamp { position: absolute; right: 18px; top: 18px; transform: rotate(-9deg);
+           border: 3px double currentColor; border-radius: 6px; padding: 4px 12px;
+           font-weight: 700; letter-spacing: 0.14em; font-size: 1.05rem; text-transform: uppercase; opacity: 0.9; }
+  .stamp.ALLOW, .stamp.APPROVED { color: var(--paid); }
+  .stamp.HOLD { color: var(--held); }
+  .stamp.REJECT, .stamp.DECLINED { color: var(--refused); }
+  .stamp.fresh { animation: thud 420ms cubic-bezier(.2, .9, .3, 1.3); }
+  @keyframes thud { from { transform: rotate(-16deg) scale(1.9); opacity: 0; } to { transform: rotate(-9deg) scale(1); opacity: 0.9; } }
+  @media (prefers-reduced-motion: reduce) { .stamp.fresh { animation: none; } }
+
+  .empty { padding: 28px; border: 1.5px dashed var(--rule); border-radius: 4px; color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Northside Roasters Ltd <span>payments agent</span></h1>
+  <div class="pulse" id="pulse"><i></i><span>Connecting to the agent…</span></div>
+</header>
+<main>
+  <aside>
+    <h2>Who authorised this agent</h2>
+    <p class="lede">Authority can only narrow on its way down. Revoke any rung and everything below it stops.</p>
+    <ol class="ladder" id="ladder"></ol>
+    <div class="meter" id="meter"></div>
+    <p class="record" id="record"></p>
+  </aside>
+  <section aria-labelledby="decisions">
+    <h2 id="decisions">Decisions</h2>
+    <p class="lede">Newest first. The model reads each invoice; the gate decides whether money moves.</p>
+    <ol class="slips" id="slips"></ol>
+    <p class="sr" aria-live="polite" id="live"></p>
+  </section>
+</main>
+<script>
+const WORD = { ALLOW: "Paid", APPROVED: "Paid", HOLD: "Held", REJECT: "Refused", DECLINED: "Declined" };
+const seen = new Set();
+let first = true;
+
+const gbp = v => "£" + Number(v || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ago = iso => { if (!iso) return null; const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  return s < 60 ? `${s} s ago` : `${Math.round(s / 60)} min ago`; };
+
+async function post(path, body) {
+  await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  refresh();
+}
+
+function limitText(l) {
+  if (!l || !l.max_single) return "";
+  return `up to ${gbp(l.max_single).replace(".00", "")} a payment, ${gbp(l.max_weekly).replace(".00", "")} a week`;
+}
+
+function renderLadder(s) {
+  const rungs = [`<li class="rung"><strong>${esc(s.principal.name)}</strong><span class="role">The company</span></li>`];
+  let broken = false;
+  for (const link of s.chain) {
+    const revoked = link.status !== "active";
+    const cls = ["rung", revoked ? "revoked" : "", broken ? "blocked" : ""].join(" ");
+    let control = "";
+    if (link.kind === "delegation") {
+      const first = esc(link.holder.split(" ")[0]);
+      control = revoked
+        ? `<button class="btn" data-restore="${esc(link.id)}">Restore ${first}'s authority</button>`
+        : `<button class="btn warn" data-revoke="${esc(link.id)}">Revoke ${first}'s authority</button>`;
+    }
+    const state = revoked ? `<span class="state">${link.status === "revoked" ? "Revoked" : "Expired"}</span>`
+                : broken ? `<span class="state">No authority: a rung above is revoked</span>` : "";
+    rungs.push(`<li class="${cls}"><strong>${esc(link.holder)}</strong><span class="role">${esc(link.role)}</span>
+      <div class="limit">${limitText(link.limits)}</div>${state}${control}</li>`);
+    if (revoked) broken = true;
+  }
+  document.getElementById("ladder").innerHTML = rungs.join("");
+  const cap = s.limits.max_weekly || 0, spent = s.week_spent || 0;
+  document.getElementById("meter").innerHTML = `<div class="bar"><b style="width:${cap ? Math.min(100, 100 * spent / cap) : 0}%"></b></div>
+    <p>This week <span class="figure">${gbp(spent)}</span> of <span class="figure">${gbp(cap)}</span></p>`;
+  const r = s.receipts;
+  const rec = document.getElementById("record");
+  rec.className = "record" + (r.ok ? "" : " broken");
+  rec.textContent = r.ok ? `${r.count} decisions on a tamper-evident record. The chain is intact.`
+                         : `The decision record was altered at ${r.first_bad}.`;
+}
+
+function slip(e) {
+  if (e.kind !== "decision") {
+    const text = e.kind === "revoked" ? `${e.by} revoked ${e.label}.` : e.kind === "restored" ? `${e.by} restored ${e.label}.`
+               : `Could not read ${e.source}: ${e.error}`;
+    return `<li class="slip event">${esc(text)}</li>`;
+  }
+  const fresh = !first && !seen.has(e.receipt);
+  seen.add(e.receipt);
+  const level = { REJECT: "reject", DECLINED: "reject", HOLD: "hold", APPROVED: "pass" }[e.decision];
+  const rs = e.reasons || [];
+  const points = (level ? rs.filter(r => r.level === level) : rs).slice(0, 2)
+    .map(r => `<li>${esc(r.text)}</li>`).join("");
+  const flag = e.injection ? `<div class="flag">This invoice contained instructions aimed at the agent. They were treated as data.</div>` : "";
+  const note = e.note && e.decision === "HOLD" ? `<p class="note">${esc(e.note)}</p>` : "";
+  let buttons = "";
+  if (e.decision === "HOLD" && window.__open.has(e.receipt)) {
+    buttons = `<div class="actions"><button class="btn go" data-approve="${e.receipt}">Approve as Tom</button>
+               <button class="btn" data-decline="${e.receipt}">Decline</button></div>`;
+  }
+  const by = e.by ? ` by ${esc(e.by)}` : "";
+  const paid = e.payment_id ? `, payment ${esc(e.payment_id)}` : "";
+  return `<li class="slip"><span class="stamp ${e.decision}${fresh ? " fresh" : ""}">${WORD[e.decision] || e.decision}</span>
+    <div><span class="who">${esc(e.payee || "Unknown payee")}</span><span class="ref">${esc(e.invoice_ref || "")}</span></div>
+    <div class="amount">${gbp(e.amount)}</div><ul>${points}</ul>${flag}${note}${buttons}
+    <div class="foot">Receipt ${esc(e.receipt)}${by}${paid}${e.read_by ? `, read by ${esc(e.read_by)}` : ""}, hash ${esc(e.hash)}</div></li>`;
+}
+
+async function refresh() {
+  let s;
+  try { s = await (await fetch("/api/state", { cache: "no-store" })).json(); }
+  catch { document.getElementById("pulse").className = "pulse stale";
+          document.querySelector("#pulse span").textContent = "The agent is not responding."; return; }
+  document.getElementById("title").innerHTML = `${esc(s.principal.name)} <span>payments agent</span>`;
+  const last = ago(s.heartbeat.last);
+  const reading = s.heartbeat.phase === "reading";
+  const stale = !reading && (!s.heartbeat.last || (Date.now() - Date.parse(s.heartbeat.last)) > 20000);
+  const pulse = document.getElementById("pulse");
+  pulse.className = "pulse" + (stale ? " stale" : "");
+  pulse.querySelector("span").textContent = reading ? `Reading ${s.heartbeat.source} with the model. Gate decision pending.`
+    : stale ? "The agent has not checked the inbox recently."
+    : `Watching the invoice inbox. Checked ${last}. ${s.heartbeat.handled} invoices handled.`;
+  window.__open = new Set(s.open_holds.map(h => h.id));
+  renderLadder(s);
+  const before = seen.size;
+  const list = document.getElementById("slips");
+  list.innerHTML = s.events.length ? s.events.map(slip).join("")
+    : `<li class="empty">No invoices yet. Drop one into the inbox, or run the demo feed.</li>`;
+  if (!first && seen.size > before) {
+    const e = s.events.find(x => x.kind === "decision");
+    if (e) document.getElementById("live").textContent = `${WORD[e.decision]}: ${e.payee}, ${gbp(e.amount)}`;
+  }
+  first = false;
+}
+
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.revoke) post("/api/revoke", { id: b.dataset.revoke, by: "jane" });
+  if (b.dataset.restore) post("/api/restore", { id: b.dataset.restore, by: "jane" });
+  if (b.dataset.approve) post(`/api/holds/${b.dataset.approve}/approve`, { by: "tom" });
+  if (b.dataset.decline) post(`/api/holds/${b.dataset.decline}/decline`, { by: "tom" });
+});
+window.__open = new Set();
+refresh();
+setInterval(refresh, 1500);
+</script>
+</body>
+</html>

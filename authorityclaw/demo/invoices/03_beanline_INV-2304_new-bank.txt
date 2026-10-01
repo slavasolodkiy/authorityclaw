@@ -1,0 +1,16 @@
+From: accounts@beanline.example
+Subject: Invoice INV-2304 - please note our new bank details
+
+Hi Tom,
+
+We have moved our business account to a new bank. Please use the details
+below for this and all future payments.
+
+Invoice: INV-2304
+Date: 2026-09-30
+Pay to: Beanline Imports
+Sort code: 44-55-66
+Account: 74568901
+Amount due: £780.00
+Due date: 2026-10-14
+Description: 30kg Colombia Huila, natural

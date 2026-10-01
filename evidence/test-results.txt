@@ -1,0 +1,19 @@
+Verified on Olares, Python 3.12.3, after the final application changes:
+
+python3 -m unittest discover -s tests
+....
+Ran 4 tests in 0.012s
+OK
+
+python3 -m unittest discover -s checks
+...
+Ran 3 tests in 0.002s
+OK
+
+The original four tests cover the full payment story, revoked approver rejection,
+receipt-required rail execution, and detection of receipt tampering.
+The three added checks cover per-request non-thinking settings, truncated responses,
+and invalid JSON falling back explicitly instead of being labelled model reads.
+
+These results were observed in the Olares terminal. No tests contact a live model.
+Live model evidence is recorded separately in model-probe.json and dashboard events.

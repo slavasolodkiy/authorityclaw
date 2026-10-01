@@ -1,0 +1,23 @@
+{
+  "principal": {"id": "northside", "name": "Northside Roasters Ltd", "note": "Fictional company for the demo"},
+  "agent": {"id": "authorityclaw", "name": "Payments agent", "mandate_id": "m-ap-001"},
+  "officers": [
+    {"id": "jane", "name": "Jane Okafor", "role": "Director", "source": "Company register (demo)",
+     "capacity": {"max_single": 25000, "max_weekly": 50000}, "valid_until": "2027-12-31"}
+  ],
+  "delegations": [
+    {"id": "del-tom", "from": "jane", "to": "tom", "to_name": "Tom Hale", "role": "Office manager",
+     "source": "Board minute 14 July 2026 (demo)",
+     "capacity": {"max_single": 1500, "max_weekly": 5000}, "valid_until": "2026-12-31"}
+  ],
+  "mandates": [
+    {"id": "m-ap-001", "granted_by": "tom", "agent": "authorityclaw", "purpose": "Pays approved supplier invoices",
+     "scope": {"action": "payment", "currency": "GBP", "max_single": 1000, "max_weekly": 3000},
+     "valid_from": "2026-09-01", "valid_until": "2026-12-31"}
+  ],
+  "approved_suppliers": [
+    {"name": "Beanline Imports", "sort_code": "11-22-33", "account": "41235678"},
+    {"name": "Hackney Dairy Co", "sort_code": "22-33-44", "account": "52346789"},
+    {"name": "Brick Lane Packaging", "sort_code": "33-44-55", "account": "63457890"}
+  ]
+}

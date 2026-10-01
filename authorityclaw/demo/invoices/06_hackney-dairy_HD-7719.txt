@@ -1,0 +1,11 @@
+From: billing@hackneydairy.example
+Subject: Weekly milk - HD-7719
+
+Invoice: HD-7719
+Date: 2026-10-01
+Pay to: Hackney Dairy Co
+Sort code: 22-33-44
+Account: 52346789
+Amount due: £198.60
+Due date: 2026-10-08
+Description: Whole and oat milk, week 41

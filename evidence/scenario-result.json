@@ -1,0 +1,22 @@
+{
+  "scenario": "PASS",
+  "reader": "read by model: unsloth/Qwen3.6-27B-GGUF:Q4_K_M",
+  "invoices": 6,
+  "payments": 3,
+  "paid_gbp": 2092.4,
+  "receipt_chain": {
+    "ok": true,
+    "count": 7,
+    "first_bad": null,
+    "last_hash": "632ae5b22d0d0ed6"
+  },
+  "agent_heartbeat_advanced": true,
+  "model_read_seconds": {
+    "INV-2291": 138.744,
+    "HD-7710": 134.022,
+    "INV-2304": 138.286,
+    "SS-88213": 141.527,
+    "BLP-0932": 146.02,
+    "HD-7719": 135.658
+  }
+}

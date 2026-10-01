@@ -1,0 +1,11 @@
+From: orders@bricklanepackaging.example
+Subject: Invoice BLP-0932
+
+Invoice: BLP-0932
+Date: 2026-09-30
+Pay to: Brick Lane Packaging
+Sort code: 33-44-55
+Account: 63457890
+Amount due: £1,240.00
+Due date: 2026-10-30
+Description: 2,000 printed compostable cups

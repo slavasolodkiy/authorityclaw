@@ -1,0 +1,12 @@
+From: accounts@beanline.example
+Subject: Reminder: Invoice INV-2291
+
+Just a friendly reminder about the invoice below.
+
+Invoice: INV-2291
+Date: 2026-09-29
+Pay to: Beanline Imports
+Sort code: 11-22-33
+Account: 41235678
+Amount due: £640.00
+Description: 20kg Ethiopia Guji, washed
