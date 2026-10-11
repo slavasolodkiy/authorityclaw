@@ -59,7 +59,10 @@ class Agent:
                      "injection": action["injection_detected"], "read_by": action["read_by"],
                      "read_seconds": read_seconds}
             if result["decision"] == "ALLOW":
-                event["payment_id"] = rail.execute(store, st, receipt, action)["payment_id"]
+                event["payment_id"] = rail.execute(
+                    store, st, receipt, action,
+                    authority=[link["id"] for link in result["chain"]],
+                )["payment_id"]
             elif result["decision"] == "HOLD":
                 note, by_model = ex.hold_note(action, result["reasons"])
                 st["holds"][receipt["id"]] = {"id": receipt["id"], "action": action, "reasons": result["reasons"],
