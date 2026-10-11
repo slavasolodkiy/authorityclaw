@@ -40,9 +40,30 @@ A sandbox can control what an agent can technically reach. It does not prove tha
 | Jane revokes Tom while the agent remains running | next normal invoice is immediately `REJECT` |
 | A past receipt is modified | chain verification identifies the break |
 
+## Post-challenge formal check
+
+The four original scenario tests covered the demo story, not every possible input. After the challenge, the authority rules were mirrored as first-order formulas and checked with Z3. The audit found six edge cases in the pre-fix implementation used for the recorded run; every counterexample was replayed against the real Python code, fixed, and kept as a regression test.
+
+| Finding | Current rule |
+|---|---|
+| `NaN`, infinite, zero or negative amounts could bypass comparisons | Amounts must be positive and finite in both the gate and the payment rail |
+| A human approver's weekly limit was not accumulated | Every payment is counted against every authority link it uses |
+| Revocation did not always reach a second-level delegate | Approval checks the approver's complete chain |
+| An amount within the director's capacity could be refused instead of escalated | A hold is routed to the lowest person in the chain who can authorise it |
+| A self-referential delegation could fail to reach an officer | Every authority chain must terminate at an officer of the company |
+
+The formal model is a hand-written mirror of the implementation, not an automatic proof of all Python code. The useful link is the replay: each solver counterexample must reproduce against the implementation and remain covered by tests. Under the published bounds, the current formal model satisfies eight stated properties, including recursive revocation and weekly-limit invariants. Autonomous payments executed solely under the agent mandate do not exceed its £3,000 weekly limit; a human may separately approve a held payment under their own live authority.
+
+```bash
+pip install z3-solver
+python3 formal/check_authority.py --rules current
+```
+
+Full property table and bounds: [`formal/RESULTS.md`](formal/RESULTS.md).
+
 ## Quick start
 
-Python 3.10+; no third-party Python dependencies.
+Python 3.10+; no third-party Python dependencies for the demo itself.
 
 ```bash
 python3 -m unittest discover -s tests
@@ -93,7 +114,8 @@ Keep `AUTHORITYCLAW_HOME` outside any directory the agent may edit. The payment 
 - `authorityclaw/store.py` — state, ledger and hash-chained receipts
 - `authorityclaw/server.py` and `authorityclaw/web/index.html` — dashboard
 - `skills/authority-gate/SKILL.md` — OpenClaw-compatible skill
-- `tests/` — end-to-end scenarios
+- `tests/` — end-to-end scenarios and replayed solver counterexamples
+- `formal/` — bounded first-order model, checks and results
 - `evidence/` — sanitised run summaries
 
 The company, people, invoices, suppliers and bank details are fictional. Built by Vladislav (Slava) Solodkiy in London for the 2026 NVIDIA London Claw Agent Challenge. MIT licence.
