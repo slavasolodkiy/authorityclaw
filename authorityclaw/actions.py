@@ -83,12 +83,13 @@ def approve_hold(store, hold_id, by="tom"):
             return {"error": f"No open hold {hold_id}."}
         action = hold["action"]
         amount = float(action.get("amount") or 0)
-        ok, why, who = gate.approver_authority(cfg, st, by, amount)
+        ok, why, who, path = gate.approver_authority(cfg, st, by, amount)
         result = gate.evaluate(action, cfg, st)
-        # A person approves on their own authority, so the agent-chain checks give way,
-        # but payee, duplicate, scope and currency failures still stop the payment.
+        # A person approves on their own authority: their own chain and limits were checked above,
+        # so the agent-chain checks give way, but payee, duplicate, scope, currency and amount failures
+        # still stop the payment.
         blocking = [r for r in result["reasons"] if r["level"] == gate.REJECT and r["code"] in
-                    ("payee_not_approved", "duplicate", "out_of_scope", "wrong_currency", "above_all_limits")]
+                    ("payee_not_approved", "duplicate", "out_of_scope", "wrong_currency", "invalid_amount")]
         if not ok or blocking:
             reasons = ([{"code": "approver_lacks_authority", "level": gate.REJECT, "text": why}] if not ok else []) + blocking
             rec = store.append_receipt({"decision": "REJECT", "action": action, "reasons": reasons,
@@ -104,7 +105,7 @@ def approve_hold(store, hold_id, by="tom"):
                     "text": f"Approved by {who}, within {who.split()[0]}'s own authority."}] + approved_points
         rec = store.append_receipt({"decision": "APPROVED", "action": action, "reasons": reasons, "decided_by": who,
                                     "of_hold": hold_id, "chain": _chain_summary(result["chain"])})
-        payment = rail.execute(store, st, rec, action, approved_by=who)
+        payment = rail.execute(store, st, rec, action, approved_by=who, authority=[link["id"] for link in path])
         hold.update(status="approved", resolved_by=who, resolved_at=now_iso(), receipt=rec["id"])
         event = _log(st, "decision", receipt=rec["id"], decision="APPROVED", payee=action["payee"],
                      amount=action["amount"], invoice_ref=action["invoice_ref"], reasons=reasons,
