@@ -8,6 +8,7 @@ against the whole chain of authority behind the agent:
 and against scope, limits, bank-detail memory, duplicates and live revocation.
 No model output can change the verdict.
 """
+import math
 import re
 from datetime import date, datetime, timezone
 
@@ -21,6 +22,20 @@ def today_utc(at=None):
 def iso_week(day):
     year, week, _ = day.isocalendar()
     return f"{year}-W{week:02d}"
+
+
+def as_amount(value):
+    """The amount as a float; anything unreadable becomes NaN, which is never payable."""
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def sane_amount(value):
+    """A payable amount is a positive, finite number: not NaN, not infinite, not zero, not negative."""
+    amount = as_amount(value)
+    return math.isfinite(amount) and amount > 0
 
 
 def norm(name):
@@ -109,11 +124,58 @@ def authority_chain(cfg, st, mandate_id, day):
             fails.append(("delegation_expired", REJECT, f"{dele['to_name']}'s authority has expired."))
         grantor = dele["from"]
 
+    if not fails and not any(link["kind"] == "officer" for link in links):
+        fails.append(("no_root", REJECT, "This authority does not trace back to an officer of the company."))
     for child, parent in zip(links, links[1:]):
         c, p = child.get("limits", {}), parent.get("limits", {})
         if c.get("max_single", 0) > p.get("max_single", 0) or c.get("max_weekly", 0) > p.get("max_weekly", 0):
             fails.append(("authority_widens", REJECT,
                           f"{child['id']} grants more than {parent['holder']} holds; authority may only narrow down the chain."))
+    return links, fails
+
+
+def person_chain(cfg, st, person_id, day):
+    """The chain of authority above a person who approves something, starting with their own link.
+
+    The same rules as the agent's chain: every link must be live, must fit inside its parent,
+    and the chain must end at an officer of the company. Revoking anyone in it stops everyone below.
+    """
+    revoked = st.get("revoked", {})
+    officers = {o["id"]: o for o in cfg.get("officers", [])}
+    delegation_of = {d["to"]: d for d in cfg.get("delegations", [])}
+    links, fails, current, hops = [], [], person_id, 0
+    while current and hops < 6:
+        hops += 1
+        own = not links
+        first = links[0]["holder"] if links else None
+        if current in officers:
+            off = officers[current]
+            status = _status(off, revoked, day)
+            links.append({"kind": "officer", "id": off["id"], "holder": off["name"], "role": off["role"],
+                          "limits": off["capacity"], "status": status})
+            if status != "active":
+                fails.append(("officer_invalid", REJECT, f"{off['name']} no longer holds authority as {off['role']}." if own
+                              else f"{first}'s authority comes through {off['name']}, who no longer holds office."))
+            break
+        dele = delegation_of.get(current)
+        if not dele:
+            fails.append(("no_capacity", REJECT, f"{current} has no recorded authority."))
+            break
+        status = _status(dele, revoked, day)
+        links.append({"kind": "delegation", "id": dele["id"], "holder": dele["to_name"], "role": dele["role"],
+                      "limits": dele["capacity"], "status": status})
+        if status != "active":
+            what = f"revoked by {revoked[dele['id']]['by']}" if status == "revoked" else "expired"
+            fails.append(("delegation_" + status, REJECT, f"{dele['to_name']}'s authority was {what}." if own
+                          else f"{first}'s authority comes through {dele['to_name']}, whose authority was {what}."))
+        current = dele["from"]
+    if links and not fails and links[-1]["kind"] != "officer":
+        fails.append(("no_root", REJECT, f"{links[0]['holder']}'s authority does not trace back to an officer of the company."))
+    for child, parent in zip(links, links[1:]):
+        c, p = child.get("limits", {}), parent.get("limits", {})
+        if c.get("max_single", 0) > p.get("max_single", 0) or c.get("max_weekly", 0) > p.get("max_weekly", 0):
+            fails.append(("authority_widens", REJECT,
+                          f"{child['holder']}'s authority is wider than {parent['holder']}'s; authority may only narrow."))
     return links, fails
 
 
@@ -144,21 +206,35 @@ def evaluate(action, cfg, st, at=None):
                        f"Bank details differ from the approved record for {supplier['name']}: the usual "
                        f"invoice-redirection pattern. Confirm through a known contact before paying."))
 
-    amount = float(action.get("amount") or 0)
-    if mandate and amount > scope.get("max_single", 0):
-        above = next((l for l in links[1:] if l["status"] == "active"), None)
-        if above and amount <= above["limits"].get("max_single", 0):
+    amount = as_amount(action.get("amount"))
+    valid = sane_amount(amount)
+    if action.get("amount") and not valid:
+        checks.append(("invalid_amount", REJECT, "The amount is not a positive, finite sum of money."))
+    if mandate and valid and amount > scope.get("max_single", 0):
+        able = next((l for l in links[1:] if l["status"] == "active" and amount <= l["limits"].get("max_single", 0)), None)
+        if able:
             checks.append(("above_agent_limit", HOLD,
                            f"{money(amount)} is above the agent's {money(scope['max_single'])} limit; "
-                           f"{above['holder']} can approve it."))
+                           f"{able['holder']} can approve it."))
         else:
             checks.append(("above_all_limits", REJECT, f"{money(amount)} is more than anyone in this chain can authorise."))
 
     week = iso_week(day)
     spent = float(st.get("weekly", {}).get(week, 0))
-    if mandate and amount and spent + amount > scope.get("max_weekly", 0):
+    if mandate and valid and spent + amount > scope.get("max_weekly", 0):
         checks.append(("weekly_limit", HOLD,
                        f"This would take the week to {money(spent + amount)}, over the {money(scope['max_weekly'])} weekly limit."))
+    used = st.get("link_weekly", {}).get(week, {})
+    over_week = any(code == "weekly_limit" for code, _, _ in checks)
+    for link in links:
+        if link["kind"] == "mandate" and over_week:
+            continue
+        cap = link["limits"].get("max_weekly", 0)
+        total = float(used.get(link["id"], 0)) + amount
+        if valid and link["status"] == "active" and total > cap:
+            checks.append(("authority_weekly_limit", HOLD,
+                           f"This would take payments under {link['holder']}'s authority to {money(total)} this week, "
+                           f"over the {money(cap)} weekly limit."))
 
     ref_key = f"{norm(action.get('payee'))}|{action.get('invoice_ref')}"
     if ref_key in st.get("paid_refs", {}):
@@ -179,25 +255,27 @@ def evaluate(action, cfg, st, at=None):
 
 
 def approver_authority(cfg, st, approver_id, amount, at=None):
-    """Can this person approve a held payment of this amount? (ok, why, display_name)"""
+    """Can this person approve a held payment of this amount? Returns (ok, why, display_name, chain).
+
+    The approver's whole chain is checked, not only their own link: revoking anyone above them
+    stops them too. Their per-payment and weekly limits both apply.
+    """
     day = today_utc(at)
-    revoked = st.get("revoked", {})
-    for off in cfg.get("officers", []):
-        if off["id"] == approver_id:
-            if _status(off, revoked, day) != "active":
-                return False, f"{off['name']} no longer holds authority.", off["name"]
-            if amount > off["capacity"].get("max_single", 0):
-                return False, f"{money(amount)} is above {off['name']}'s authority.", off["name"]
-            return True, "", off["name"]
-    for dele in cfg.get("delegations", []):
-        if dele["to"] == approver_id:
-            name = dele["to_name"]
-            if _status(dele, revoked, day) != "active":
-                return False, f"{name}'s authority was revoked by {revoked.get(dele['id'], {}).get('by', 'the grantor')}.", name
-            parent = next((o for o in cfg.get("officers", []) if o["id"] == dele["from"]), None)
-            if parent and _status(parent, revoked, day) != "active":
-                return False, f"{name}'s authority came from {parent['name']}, who no longer holds office.", name
-            if amount > dele["capacity"].get("max_single", 0):
-                return False, f"{money(amount)} is above {name}'s authority.", name
-            return True, "", name
-    return False, f"{approver_id} has no recorded authority.", approver_id
+    links, fails = person_chain(cfg, st, approver_id, day)
+    if not links:
+        return False, f"{approver_id} has no recorded authority.", approver_id, links
+    name = links[0]["holder"]
+    if fails:
+        return False, fails[0][2], name, links
+    if not sane_amount(amount):
+        return False, "The amount is not a positive, finite sum of money.", name, links
+    if amount > links[0]["limits"].get("max_single", 0):
+        return False, f"{money(amount)} is above {name}'s authority.", name, links
+    used = st.get("link_weekly", {}).get(iso_week(day), {})
+    for link in links:
+        cap = link["limits"].get("max_weekly", 0)
+        total = float(used.get(link["id"], 0)) + amount
+        if total > cap:
+            return False, (f"This would take payments under {link['holder']}'s authority to {money(total)} this week, "
+                           f"over the {money(cap)} weekly limit."), name, links
+    return True, "", name, links
