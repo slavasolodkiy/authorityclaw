@@ -1,11 +1,18 @@
 """A simulated Faster Payments rail. It pays only against a valid authority receipt."""
-from .gate import iso_week, norm, today_utc
+from .gate import iso_week, norm, sane_amount, today_utc
 from .store import now_iso
 
 
-def execute(store, st, receipt, action, approved_by=None):
+def execute(store, st, receipt, action, approved_by=None, authority=()):
+    """Pay against an ALLOW or APPROVED receipt.
+
+    ``authority`` lists every mandate, delegation or officer link whose authority
+    this payment uses. Each link's weekly total increases by the amount.
+    """
     if receipt.get("decision") not in ("ALLOW", "APPROVED"):
         raise PermissionError("Payment refused: no ALLOW or APPROVED authority receipt.")
+    if not sane_amount(action.get("amount")):
+        raise PermissionError("Payment refused: the amount is not a positive, finite sum of money.")
     ok, bad, _, _ = store.verify_chain()
     if not ok:
         raise PermissionError(f"Payment refused: receipt chain broken at {bad}.")
@@ -29,6 +36,9 @@ def execute(store, st, receipt, action, approved_by=None):
     store.append_ledger(entry)
     week = iso_week(today_utc())
     st["weekly"][week] = round(float(st["weekly"].get(week, 0)) + amount, 2)
+    used = st.setdefault("link_weekly", {}).setdefault(week, {})
+    for link_id in authority:
+        used[link_id] = round(float(used.get(link_id, 0)) + amount, 2)
     st["paid_refs"][f"{norm(action['payee'])}|{action['invoice_ref']}"] = entry["payment_id"]
     memory = st["suppliers"].setdefault(action["payee"], {"payments": 0, "total": 0.0})
     memory["payments"] += 1
