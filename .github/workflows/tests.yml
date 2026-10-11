@@ -11,3 +11,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: python3 -m unittest discover -s tests -v
+      - run: pip install z3-solver && python3 formal/check_authority.py --rules current
