@@ -2,15 +2,20 @@
 
 > **The model reads. The gate decides. The agent cannot authorise itself.**
 
+**First Place — NVIDIA Claw Agent Challenge: London (2026).**
+
 AuthorityClaw is a long-running accounts-payable agent for a fictional small business. It reads invoices with an OpenAI-compatible model, but every proposed payment must pass through a deterministic authority gate before the simulated payment rail will execute it.
 
-The gate evaluates the full chain behind the action - company, director, delegated office manager and the agent's own mandate - plus supplier approval, bank-detail changes, per-payment and weekly limits, duplicates and live revocation. Every outcome is **ALLOW**, **HOLD** or **REJECT**, with a tamper-evident receipt.
+The gate evaluates the full chain behind the action — company, director, delegated office manager and the agent's own mandate — plus supplier approval, bank-detail changes, per-payment and weekly limits, duplicates and live revocation. Every outcome is **ALLOW**, **HOLD** or **REJECT**, with a tamper-evident receipt.
 
-![Verified dashboard](docs/verified-dashboard.png)
+- [Project page](https://www.solodkiy.cv/authorityclaw.html)
+- [Full research trail — Sovereign Agent Lab](https://www.solodkiy.cv/sovereign-agent-lab.html)
 
-## Verified challenge run
+![Recorded challenge dashboard](docs/verified-dashboard.png)
 
-The NVIDIA London Claw Agent Challenge snapshot was verified on an Olares One with an NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) and the local `unsloth/Qwen3.6-27B-GGUF:Q4_K_M` model through `llama.cpp`.
+## Recorded challenge run
+
+The NVIDIA London Claw Agent Challenge snapshot ran on an Olares One with an NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) and the local `unsloth/Qwen3.6-27B-GGUF:Q4_K_M` model through `llama.cpp`.
 
 - 4/4 end-to-end tests passed
 - six invoices were read by the local model
@@ -18,13 +23,13 @@ The NVIDIA London Claw Agent Challenge snapshot was verified on an Olares One wi
 - the receipt chain verified successfully
 - all payments were simulated; no real money moved
 
-The verified run used AuthorityClaw's own persistent Python harness and called the existing local model service directly. An OpenClaw-compatible skill is included under `skills/authority-gate`. The Olares Market NemoClaw package was present on the test machine, but NemoClaw/OpenClaw runtime integration is not claimed for this verified run.
+NVIDIA awarded the demonstration First Place. This is external recognition of the work, **not** an independent technical validation, compliance certification or regulatory approval.
+
+The recorded run used AuthorityClaw's own persistent Python harness and called the existing local model service directly. An OpenClaw-compatible skill is included under `skills/authority-gate`. The Olares Market NemoClaw package and OpenShell were present on the same machine, but NemoClaw/OpenClaw runtime integration is not claimed for this recorded run.
 
 ## Why it matters
 
 A sandbox can control what an agent can technically reach. It does not prove that the organisation still authorises the action. AuthorityClaw makes that second question explicit and executable.
-
-The demo shows:
 
 | Scenario | Decision |
 |---|---|
@@ -81,14 +86,14 @@ Keep `AUTHORITYCLAW_HOME` outside any directory the agent may edit. The payment 
 
 ## Repository map
 
-- `authorityclaw/agent.py` - long-running inbox loop
-- `authorityclaw/extract.py` - model-backed extraction and explicit fallback
-- `authorityclaw/gate.py` - deterministic authority and payment checks
-- `authorityclaw/rail.py` - simulated receipt-gated payment rail
-- `authorityclaw/store.py` - state, ledger and hash-chained receipts
-- `authorityclaw/server.py` and `authorityclaw/web/index.html` - dashboard
-- `skills/authority-gate/SKILL.md` - OpenClaw-compatible skill
-- `tests/` - end-to-end scenarios
-- `evidence/` - sanitized verification summaries from the NVIDIA challenge run
+- `authorityclaw/agent.py` — long-running inbox loop
+- `authorityclaw/extract.py` — model-backed extraction and explicit fallback
+- `authorityclaw/gate.py` — deterministic authority and payment checks
+- `authorityclaw/rail.py` — simulated receipt-gated payment rail
+- `authorityclaw/store.py` — state, ledger and hash-chained receipts
+- `authorityclaw/server.py` and `authorityclaw/web/index.html` — dashboard
+- `skills/authority-gate/SKILL.md` — OpenClaw-compatible skill
+- `tests/` — end-to-end scenarios
+- `evidence/` — sanitised run summaries
 
 The company, people, invoices, suppliers and bank details are fictional. Built by Vladislav (Slava) Solodkiy in London for the 2026 NVIDIA London Claw Agent Challenge. MIT licence.
